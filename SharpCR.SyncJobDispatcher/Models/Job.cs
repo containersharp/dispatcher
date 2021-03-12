@@ -6,13 +6,13 @@ namespace SharpCR.SyncJobDispatcher.Models
     {
         public string Id { get; set; }
         
-        public string RegistryHostName { get; set; }
-        
         public string ImageRepository { get; set; }
         
         public string Tag { get; set; }
         
-        public string PullSecret { get; set; }
+        public string Digest { get; set; }
+        
+        public string AuthorizationToken { get; set; }
         
         public long Size { get; set; }
 
@@ -24,9 +24,9 @@ namespace SharpCR.SyncJobDispatcher.Models
             return new Job
             {
                 Id = this.Id,
-                RegistryHostName = this.RegistryHostName,
                 ImageRepository = this.ImageRepository,
                 Tag = this.Tag,
+                Digest = this.Digest,
                 Trails = this.Trails
             };
         }

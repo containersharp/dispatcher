@@ -30,6 +30,7 @@ namespace SharpCR.SyncJobDispatcher.Controllers
             _config = dispatcherOptions.Value;
         }
 
+        [HttpPost]
         public Job Post([FromForm] string worker, [FromForm] string jobId)
         {
             if (string.IsNullOrEmpty(worker))

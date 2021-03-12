@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using SharpCR.SyncJobDispatcher.Models;
+using SharpCR.SyncJobDispatcher.Services;
 
 namespace SharpCR.SyncJobDispatcher.Controllers
 {
@@ -14,22 +17,43 @@ namespace SharpCR.SyncJobDispatcher.Controllers
     {
         private readonly ILogger<JobsController> _logger;
         private readonly ConcurrentQueue<Job> _theJobQueue;
+        private readonly ManifestProber _prober;
 
-        public JobsController(ILogger<JobsController> logger, ConcurrentQueue<Job> theJobQueue)
+        public JobsController(ILogger<JobsController> logger, 
+            ConcurrentQueue<Job> theJobQueue,
+            ManifestProber prober)
         {
             _logger = logger;
             _theJobQueue = theJobQueue;
+            _prober = prober;
         }
 
-        // 1. 接收来自境内的 post /jobs 请求，尝试检查上游仓库中是否存在指定的镜像，如果有，则返回 manifest，并立即使 job 入队，等待同步
-        public IActionResult Post([FromBody] Job syncJob)
+        [HttpPost]
+        public async Task<IActionResult> Post([FromBody] Job syncJob)
         {
-            // 1. todo: check if it exists
+            if (syncJob == null || string.IsNullOrEmpty(syncJob.ImageRepository))
+            {
+                _logger.LogWarning("Ignoring request: no valid sync job object found.");
+                return NotFound();
+            }
+            
+            var upstreamManifest = await _prober.ProbeManifestAsync(syncJob);
+            if (upstreamManifest == null)
+            {
+                _logger.LogInformation("No manifest found for request: @job", syncJob.ToPublicModel());
+                return NotFound();
+            }
+
             syncJob.Id = Guid.NewGuid().ToString("N");
+            syncJob.Size = upstreamManifest.Size;
             _theJobQueue.Enqueue(syncJob);
-            return Ok();
+
+            _logger.LogInformation("Sync request queued: @job", syncJob.ToPublicModel());
+            var manifestStream = new MemoryStream(upstreamManifest.Bytes);
+            return new FileStreamResult(manifestStream, upstreamManifest.MediaType);
         }
 
+        [HttpGet]
         public IEnumerable<Job> Get()
         {
             return _theJobQueue.Select(job => job.ToPublicModel()).ToArray();
