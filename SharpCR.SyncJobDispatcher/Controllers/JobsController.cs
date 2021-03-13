@@ -19,9 +19,7 @@ namespace SharpCR.SyncJobDispatcher.Controllers
         private readonly ConcurrentQueue<Job> _theJobQueue;
         private readonly ManifestProber _prober;
 
-        public JobsController(ILogger<JobsController> logger, 
-            ConcurrentQueue<Job> theJobQueue,
-            ManifestProber prober)
+        public JobsController(ILogger<JobsController> logger,  ConcurrentQueue<Job> theJobQueue, ManifestProber prober)
         {
             _logger = logger;
             _theJobQueue = theJobQueue;

@@ -31,7 +31,7 @@ namespace SharpCR.SyncJobDispatcher.Controllers
         }
 
         [HttpPost]
-        public Job Post([FromForm] string worker, [FromForm] string jobId)
+        public Job Post([FromForm] string worker, [FromForm] string jobId, [FromForm] int? result)
         {
             if (string.IsNullOrEmpty(worker))
             {
@@ -43,15 +43,13 @@ namespace SharpCR.SyncJobDispatcher.Controllers
 
             if (!string.IsNullOrEmpty(jobId))
             {
-                var job = _theWorkingList.Find(j => j.Id == jobId);
-                if (job != null)
-                {
-                    _theWorkingList.Remove(job);
-                }
+                HandleTrailResult(worker, jobId, result);
             }
             
             while (stopwatch.Elapsed.Minutes < _config.MaxWorkerPollMinutes)
             {
+                Thread.Sleep(TimeSpan.FromMilliseconds(100));
+
                 if (_theJobQueue.TryDequeue(out var job))
                 {
                     job.Trails.Add(new Trail{ StartTime = DateTime.UtcNow, WorkerHost = worker});
@@ -59,10 +57,28 @@ namespace SharpCR.SyncJobDispatcher.Controllers
                     stopwatch.Stop();
                     return job;
                 }
-
-                Thread.Sleep(TimeSpan.FromMilliseconds(50));
             }
             return null;
+        }
+
+        private void HandleTrailResult(string worker, string jobId, int? result)
+        {
+            var job = _theWorkingList.Find(j => j.Id == jobId);
+            if (job == null) return;
+            _theWorkingList.Remove(job);
+
+            if (result == 0)
+            {
+                _logger.LogInformation("Job @job successfully synced by worker @worker.", job.ToPublicModel(), worker);
+                return;
+            }
+            
+            var tryAgain = job.Trails.Count < _config.MaxTrails;
+            _logger.LogWarning("Job @job has failed from worker @worker. Try again: @tryAgain", job.ToPublicModel(), worker, tryAgain);
+            if (tryAgain)
+            {
+                _theJobQueue.Enqueue(job);
+            }
         }
     }
 }
