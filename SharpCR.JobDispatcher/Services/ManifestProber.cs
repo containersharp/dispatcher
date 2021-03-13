@@ -3,10 +3,10 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using SharpCR.JobDispatcher.Models;
 using SharpCR.Manifests;
-using SharpCR.SyncJobDispatcher.Models;
 
-namespace SharpCR.SyncJobDispatcher.Services
+namespace SharpCR.JobDispatcher.Services
 {
     public class ManifestProber
     {

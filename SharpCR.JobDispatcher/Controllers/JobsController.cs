@@ -6,10 +6,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using SharpCR.SyncJobDispatcher.Models;
-using SharpCR.SyncJobDispatcher.Services;
+using SharpCR.JobDispatcher.Models;
+using SharpCR.JobDispatcher.Services;
 
-namespace SharpCR.SyncJobDispatcher.Controllers
+namespace SharpCR.JobDispatcher.Controllers
 {
     [ApiController]
     [Route("[controller]")]

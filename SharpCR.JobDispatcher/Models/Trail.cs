@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace SharpCR.SyncJobDispatcher.Models
+namespace SharpCR.JobDispatcher.Models
 {
     public class Trail
     {

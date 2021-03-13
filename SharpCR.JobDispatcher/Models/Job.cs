@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace SharpCR.SyncJobDispatcher.Models
+namespace SharpCR.JobDispatcher.Models
 {
     public class Job
     {

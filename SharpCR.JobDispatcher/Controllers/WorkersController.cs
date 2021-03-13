@@ -6,9 +6,9 @@ using System.Threading;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using SharpCR.SyncJobDispatcher.Models;
+using SharpCR.JobDispatcher.Models;
 
-namespace SharpCR.SyncJobDispatcher.Controllers
+namespace SharpCR.JobDispatcher.Controllers
 {
 
     [ApiController]

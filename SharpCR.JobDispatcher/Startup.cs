@@ -5,10 +5,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using SharpCR.SyncJobDispatcher.Models;
-using SharpCR.SyncJobDispatcher.Services;
+using SharpCR.JobDispatcher.Models;
+using SharpCR.JobDispatcher.Services;
 
-namespace SharpCR.SyncJobDispatcher
+namespace SharpCR.JobDispatcher
 {
     public class Startup
     {

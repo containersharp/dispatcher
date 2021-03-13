@@ -1,4 +1,4 @@
-﻿namespace SharpCR.SyncJobDispatcher
+﻿namespace SharpCR.JobDispatcher
 {
     // ReSharper disable once InconsistentNaming
     public class DispatcherConfig

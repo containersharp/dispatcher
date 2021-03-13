@@ -7,9 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using SharpCR.SyncJobDispatcher.Models;
+using SharpCR.JobDispatcher.Models;
 
-namespace SharpCR.SyncJobDispatcher.Services
+namespace SharpCR.JobDispatcher.Services
 {
     public class Sweeper
     {
