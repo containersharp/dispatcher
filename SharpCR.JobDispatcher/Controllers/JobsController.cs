@@ -36,13 +36,7 @@ namespace SharpCR.JobDispatcher.Controllers
                 return NotFound();
             }
 
-            var upstreamManifest = new ProbedManifest
-            {
-                Bytes = Encoding.UTF8.GetBytes(Guid.NewGuid().ToString("N")),
-                MediaType = WellKnownMediaTypes.DockerImageManifestV2,
-                Size = 100,
-
-            }; // await _prober.ProbeManifestAsync(syncJob);
+            var upstreamManifest =  await _prober.ProbeManifestAsync(syncJob);
             if (upstreamManifest == null)
             {
                 _logger.LogInformation("No manifest found for request: @job", syncJob.ToPublicModel());
