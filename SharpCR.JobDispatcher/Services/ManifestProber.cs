@@ -1,15 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
+using Docker.Registry.DotNet;
+using Docker.Registry.DotNet.Authentication;
+using Docker.Registry.DotNet.Models;
 using Microsoft.Extensions.Logging;
 using SharpCR.JobDispatcher.Models;
 using SharpCR.Manifests;
+using Manifest = SharpCR.Manifests.Manifest;
 
 namespace SharpCR.JobDispatcher.Services
 {
     public class ManifestProber
     {
+        private const string ManifestUrlPrefix = "/v2/manifests/";
         private readonly ILogger<ManifestProber> _logger;
         private readonly HttpClient _httpClient;
         private IManifestParser[] _parsers;
@@ -25,67 +32,75 @@ namespace SharpCR.JobDispatcher.Services
                 .Select(x => Activator.CreateInstance(x) as IManifestParser)
                 .ToArray();
         }
-        
-        
+
         public async Task<ProbedManifest> ProbeManifestAsync(Job jobRequest)
         {
             var jobPublic = jobRequest.ToPublicModel();
             var reference = string.IsNullOrEmpty(jobRequest.Tag) ? jobRequest.Digest : jobRequest.Tag;
-            var manifestUrl = $"https://{jobRequest.ImageRepository}/v2/manifests/{reference}";
-            
-            var probeRequest = new HttpRequestMessage(HttpMethod.Get, manifestUrl);
-            if (!string.IsNullOrEmpty(jobRequest.AuthorizationToken))
-            {
-                probeRequest.Headers.TryAddWithoutValidation("Authorization", jobRequest.AuthorizationToken);
-            }
-            else
-            {
-                // todo: add default auth info for different repositories
-            }
+            var manifestUrl = GetRegistryManifestUri(jobPublic.ImageRepository);
 
             try
             {
-                var manifestResponse = await _httpClient.SendAsync(probeRequest);
-                if (!manifestResponse.IsSuccessStatusCode)
-                {
-                    _logger.LogWarning("Failed http response @code for manifest probing for @job.", manifestResponse.StatusCode, jobPublic);
-                    return null;
-                }
-
-                var manifest = await TryParseManifestFromResponse(manifestResponse);
-                if (manifest == null)
-                {
-                    _logger.LogWarning("Error parsing manifest for job @job.", jobPublic);
-                    return null;
-                }
-
+                var configuration = new RegistryClientConfiguration(manifestUrl.GetComponents(UriComponents.Host | UriComponents.Port, UriFormat.SafeUnescaped));
+                var authProvider = new AnonymousOAuthAuthenticationProvider();
+                using var client = configuration.CreateClient(authProvider);
+                var manifestResult = await client.Manifest.GetManifestAsync(manifestUrl.PathAndQuery.Substring(ManifestUrlPrefix.Length), reference);
+                var manifestBytes = Encoding.UTF8.GetBytes(manifestResult.Content);
+                var parsedManifest = TryParseManifestFromResponse(manifestBytes);
+                
                 return new ProbedManifest
                 {
-                    Bytes = manifest.RawJsonBytes,
-                    MediaType = manifest.MediaType ?? manifestResponse.Content.Headers?.ContentType?.MediaType,
-                    Size = (manifest.Layers ?? new Descriptor[0]).Select(l => l.Size ?? 0).Sum()
+                    Bytes = manifestBytes,
+                    MediaType = manifestResult.MediaType,
+                    Size = (parsedManifest.Layers ?? new Descriptor[0]).Select(l => l.Size ?? 0).Sum()
                 };
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogWarning("Error probing manifest for job @job. Error: @ex", jobPublic, ex.ToString());
                 return null;
             }
         }
 
-        async Task<Manifest> TryParseManifestFromResponse(HttpResponseMessage response)
+
+        static Uri GetRegistryManifestUri(string imageRegistry)
         {
-            if (response.Content == null)
+            var parts = imageRegistry.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 1)
             {
-                return null;
+                imageRegistry = $"docker.io/library/{imageRegistry}";
+            }
+            if (parts.Length == 2)
+            {
+                imageRegistry = $"docker.io/{imageRegistry}";
             }
 
-            var content =  await response.Content.ReadAsByteArrayAsync();
+            var fakeUri = new Uri($"https://{ManifestUrlPrefix}{imageRegistry}");
+            var manifestUriBuilder = new UriBuilder(Uri.UriSchemeHttps);
+            if (!WellKnownRegistryMapping.TryGetValue(fakeUri.Host, out var registryHost))
+            {
+                registryHost = fakeUri.Host;
+            }
+            manifestUriBuilder.Host = registryHost;
+            manifestUriBuilder.Port = fakeUri.Port;
+            manifestUriBuilder.Path = $"{fakeUri.PathAndQuery}";
+
+            return manifestUriBuilder.Uri;
+        }
+
+        private static readonly Dictionary<string, string> WellKnownRegistryMapping = new Dictionary<string, string>()
+        {
+            {"docker.io", "registry-1.docker.io"},
+            {"hub.docker.com", "registry-1.docker.io"},
+        };
+
+        Manifest TryParseManifestFromResponse(byte[] bytes)
+        {
             return _parsers.Select(p =>
                 {
                     try
                     {
-                        return p.Parse(content);
+                        return p.Parse(bytes);
                     }
                     catch { return null; }
                 })

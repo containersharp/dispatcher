@@ -8,7 +8,7 @@ namespace SharpCR.SyncJobDispatcher.Tests
         [Fact]
         public void Test1()
         {
-
+            
         }
     }
 }
