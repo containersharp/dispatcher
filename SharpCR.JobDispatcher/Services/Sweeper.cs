@@ -14,12 +14,12 @@ namespace SharpCR.JobDispatcher.Services
     public class Sweeper
     {
         private readonly ILogger<Sweeper> _logger;
-        private readonly ConcurrentQueue<Job> _theJobQueue;
+        private readonly JobProducerConsumerQueue _theJobQueue;
         private readonly List<Job> _theWorkingList;
         private readonly DispatcherConfig _config;
         private bool _stopped = false;
         
-        public Sweeper(ILogger<Sweeper> logger, IOptions<DispatcherConfig> dispatcherOptions, ConcurrentQueue<Job> theJobQueue, List<Job> theWorkingList)
+        public Sweeper(ILogger<Sweeper> logger, IOptions<DispatcherConfig> dispatcherOptions, JobProducerConsumerQueue theJobQueue, List<Job> theWorkingList)
         {
             _logger = logger;
             _theJobQueue = theJobQueue;
@@ -45,7 +45,7 @@ namespace SharpCR.JobDispatcher.Services
                 {
                     var job = _theWorkingList[index];
                     var lastTrial = job.Trails.OrderByDescending(t => t.StartTime).First();
-                    var maxSeconds = job.Size / (_config.LowestSyncSpeedKbps * 1024);
+                    var maxSeconds = Math.Max(job.Size / (_config.LowestSyncSpeedKbps * 1024), 5);
                     var elapsed = now - lastTrial.StartTime;
 
                     if (elapsed.TotalSeconds > maxSeconds)
@@ -59,7 +59,7 @@ namespace SharpCR.JobDispatcher.Services
                         if (tryAgain)
                         {
                             _logger.LogWarning("Retrying job @job", job.ToPublicModel());
-                            _theJobQueue.Enqueue(job);
+                            _theJobQueue.AddJob(job);
                         }
                     }
                 }

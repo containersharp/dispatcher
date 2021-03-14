@@ -3,10 +3,12 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SharpCR.JobDispatcher.Models;
+using SharpCR.JobDispatcher.Services;
 
 namespace SharpCR.JobDispatcher.Controllers
 {
@@ -16,13 +18,13 @@ namespace SharpCR.JobDispatcher.Controllers
     public class WorkersController : ControllerBase
     {
         private readonly ILogger<WorkersController> _logger;
-        private readonly ConcurrentQueue<Job> _theJobQueue;
+        private readonly JobProducerConsumerQueue _theJobQueue;
         private readonly List<Job> _theWorkingList;
         private readonly DispatcherConfig _config;
 
         public WorkersController(ILogger<WorkersController> logger,
             IOptions<DispatcherConfig> dispatcherOptions,
-            ConcurrentQueue<Job> theJobQueue, List<Job> theWorkingList)
+            JobProducerConsumerQueue theJobQueue, List<Job> theWorkingList)
         {
             _logger = logger;
             _theJobQueue = theJobQueue;
@@ -31,7 +33,7 @@ namespace SharpCR.JobDispatcher.Controllers
         }
 
         [HttpPost]
-        public Job Post([FromForm] string worker, [FromForm] string jobId, [FromForm] int? result)
+        public async Task<Job> Post([FromForm] string worker, [FromForm] string jobId, [FromForm] int? result)
         {
             if (string.IsNullOrEmpty(worker))
             {
@@ -45,21 +47,27 @@ namespace SharpCR.JobDispatcher.Controllers
             {
                 HandleTrailResult(worker, jobId, result);
             }
-            
-            while (stopwatch.Elapsed.Minutes < _config.MaxWorkerPollMinutes)
-            {
-                Thread.Sleep(TimeSpan.FromMilliseconds(100));
 
-                if (_theJobQueue.TryDequeue(out var job))
+            var delayTask = Task.Delay(TimeSpan.FromMinutes(3));
+            var jobAssignmentTask = new TaskCompletionSource<Job>();
+            _theJobQueue.AddWorker(job =>
+            {
+                if (delayTask.Status == TaskStatus.RanToCompletion)
                 {
-                    job.Trails.Add(new Trail{ StartTime = DateTime.UtcNow, WorkerHost = worker});
-                    _theWorkingList.Add(job);
-                    stopwatch.Stop();
-                    return job;
+                    delayTask.Dispose();
+                    delayTask = null;
+                    jobAssignmentTask = null;
+                    return false;
                 }
-            }
-            return null;
+                    
+                jobAssignmentTask.SetResult(job);
+                return true;
+            });
+            await Task.WhenAny(jobAssignmentTask.Task, delayTask);
+            return jobAssignmentTask.Task.Status == TaskStatus.RanToCompletion ? jobAssignmentTask.Task.Result : null;
         }
+        
+        
 
         private void HandleTrailResult(string worker, string jobId, int? result)
         {
@@ -77,7 +85,7 @@ namespace SharpCR.JobDispatcher.Controllers
             _logger.LogWarning("Job @job has failed from worker @worker. Try again: @tryAgain", job.ToPublicModel(), worker, tryAgain);
             if (tryAgain)
             {
-                _theJobQueue.Enqueue(job);
+                _theJobQueue.AddJob(job);
             }
         }
     }

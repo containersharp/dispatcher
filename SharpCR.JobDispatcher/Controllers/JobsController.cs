@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -16,10 +17,10 @@ namespace SharpCR.JobDispatcher.Controllers
     public class JobsController : ControllerBase
     {
         private readonly ILogger<JobsController> _logger;
-        private readonly ConcurrentQueue<Job> _theJobQueue;
+        private readonly JobProducerConsumerQueue _theJobQueue;
         private readonly ManifestProber _prober;
 
-        public JobsController(ILogger<JobsController> logger,  ConcurrentQueue<Job> theJobQueue, ManifestProber prober)
+        public JobsController(ILogger<JobsController> logger,  JobProducerConsumerQueue theJobQueue, ManifestProber prober)
         {
             _logger = logger;
             _theJobQueue = theJobQueue;
@@ -34,8 +35,14 @@ namespace SharpCR.JobDispatcher.Controllers
                 _logger.LogWarning("Ignoring request: no valid sync job object found.");
                 return NotFound();
             }
-            
-            var upstreamManifest = await _prober.ProbeManifestAsync(syncJob);
+
+            var upstreamManifest = new ProbedManifest
+            {
+                Bytes = Encoding.UTF8.GetBytes(Guid.NewGuid().ToString("N")),
+                MediaType = WellKnownMediaTypes.DockerImageManifestV2,
+                Size = 100,
+
+            }; // await _prober.ProbeManifestAsync(syncJob);
             if (upstreamManifest == null)
             {
                 _logger.LogInformation("No manifest found for request: @job", syncJob.ToPublicModel());
@@ -44,7 +51,7 @@ namespace SharpCR.JobDispatcher.Controllers
 
             syncJob.Id = Guid.NewGuid().ToString("N");
             syncJob.Size = upstreamManifest.Size;
-            _theJobQueue.Enqueue(syncJob);
+            _theJobQueue.AddJob(syncJob);
 
             _logger.LogInformation("Sync request queued: @job", syncJob.ToPublicModel());
             var manifestStream = new MemoryStream(upstreamManifest.Bytes);
@@ -54,7 +61,7 @@ namespace SharpCR.JobDispatcher.Controllers
         [HttpGet]
         public IEnumerable<Job> Get()
         {
-            return _theJobQueue.Select(job => job.ToPublicModel()).ToArray();
+            return _theJobQueue.GetPendingJobs().Select(job => job.ToPublicModel()).ToArray();
         }
     }
 }
