@@ -14,7 +14,7 @@ namespace SharpCR.JobDispatcher.Models
         
         public string AuthorizationToken { get; set; }
         
-        public long Size { get; set; }
+        public long? Size { get; set; }
 
         public List<Trail> Trails { get; set; } = new List<Trail>();
         

@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using Docker.Registry.DotNet;
 using Docker.Registry.DotNet.Authentication;
-using Docker.Registry.DotNet.Models;
+using Docker.Registry.DotNet.Registry;
 using Microsoft.Extensions.Logging;
 using SharpCR.JobDispatcher.Models;
 using SharpCR.Manifests;
@@ -16,16 +15,11 @@ namespace SharpCR.JobDispatcher.Services
 {
     public class ManifestProber
     {
-        private const string ManifestUrlPattern = "/v2/manifests/";
         private readonly ILogger<ManifestProber> _logger;
-        private readonly HttpClient _httpClient;
-        private IManifestParser[] _parsers;
+        private readonly IManifestParser[] _parsers;
         public ManifestProber(ILogger<ManifestProber> logger)
         {
             _logger = logger;
-            _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Docker-Client/19.03.5 (linux)");
-
             var parserType = typeof(IManifestParser);
             _parsers = parserType.Assembly.GetExportedTypes()
                 .Where(t => (t.IsPublic || t.IsNestedPublic) && t.IsClass && parserType.IsAssignableFrom(t))
@@ -37,18 +31,15 @@ namespace SharpCR.JobDispatcher.Services
         {
             var jobPublic = jobRequest.ToPublicModel();
             var reference = string.IsNullOrEmpty(jobRequest.Tag) ? jobRequest.Digest : jobRequest.Tag;
-            var manifestUrl = GetRegistryManifestUri(jobPublic.ImageRepository);
+            var probeContext = GetProbeContext(jobRequest);
 
             try
             {
-                var configuration = new RegistryClientConfiguration(manifestUrl.GetComponents(UriComponents.Host | UriComponents.Port, UriFormat.SafeUnescaped));
+                var configuration = new RegistryClientConfiguration(probeContext.Registry);
                 var authProvider = new AnonymousOAuthAuthenticationProvider();
                 using var client = configuration.CreateClient(authProvider);
 
-                var repoName = manifestUrl.PathAndQuery.Substring(1, 
-                    manifestUrl.PathAndQuery.IndexOf(ManifestUrlPattern, StringComparison.Ordinal) -1);
-                
-                var manifestResult = await client.Manifest.GetManifestAsync(repoName, reference);
+                var manifestResult = await client.Manifest.GetManifestAsync(probeContext.RepoName, reference);
                 var parsedManifest = TryParseManifestFromResponse(Encoding.UTF8.GetBytes(manifestResult.Content));
 
                 if (parsedManifest == null)
@@ -56,27 +47,7 @@ namespace SharpCR.JobDispatcher.Services
                     return null;
                 }
 
-                var probeManifestAsync = new ProbedResult();
-                if (parsedManifest is ManifestV2List manifestV2List)
-                {
-                    probeManifestAsync.ListManifest = manifestV2List;
-                    var subManifests = new List<Manifest>();
-                    foreach (var listItem in manifestV2List.Manifests)
-                    {
-                        var subManifestResult = await client.Manifest.GetManifestAsync(repoName, listItem.Digest);
-                        var manifest = TryParseManifestFromResponse(Encoding.UTF8.GetBytes(subManifestResult.Content));
-                        if (manifest != null)
-                        {
-                            subManifests.Add(manifest);
-                        }
-                    }
-                    probeManifestAsync.ManifestItems = subManifests.ToArray();
-                }
-                else
-                {
-                    probeManifestAsync.ManifestItems = new[] {parsedManifest};
-                }
-                return probeManifestAsync;
+                return await DigSubManifests(parsedManifest, client, probeContext.RepoName);
             }
             catch (Exception ex)
             {
@@ -85,32 +56,59 @@ namespace SharpCR.JobDispatcher.Services
             }
         }
 
-
-        static Uri GetRegistryManifestUri(string imageRegistry)
+        private async Task<ProbedResult> DigSubManifests(Manifest parsedManifest, IRegistryClient client, string repoName)
         {
-            var parts = imageRegistry.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var probedResult = new ProbedResult();
+            
+            if (parsedManifest is ManifestV2List manifestV2List)
+            {
+                probedResult.ListManifest = manifestV2List;
+                var subManifests = new List<Manifest>();
+                foreach (var listItem in manifestV2List.Manifests)
+                {
+                    var subManifestResult = await client.Manifest.GetManifestAsync(repoName, listItem.Digest);
+                    var manifest = TryParseManifestFromResponse(Encoding.UTF8.GetBytes(subManifestResult.Content));
+                    if (manifest != null)
+                    {
+                        subManifests.Add(manifest);
+                    }
+                }
+                probedResult.ManifestItems = subManifests.ToArray();
+            }
+            else
+            {
+                probedResult.ManifestItems = new[] {parsedManifest};
+            }
+
+            return probedResult;
+        }
+
+        static ProbeContext GetProbeContext(Job job)
+        {
+            var rawRepoName = job.ImageRepository;
+            var canonicalRepoName = rawRepoName;
+            var parts = rawRepoName.Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 1)
             {
-                imageRegistry = $"docker.io/library/{imageRegistry}";
+                canonicalRepoName = $"docker.io/library/{rawRepoName}";
             }
             if (parts.Length == 2)
             {
-                imageRegistry = $"docker.io/{imageRegistry}";
+                canonicalRepoName = $"docker.io/{rawRepoName}";
             }
 
-            var fakeUri = new Uri($"https://{imageRegistry}{ManifestUrlPattern}");
-            var manifestUriBuilder = new UriBuilder
-            {
-                Scheme = Uri.UriSchemeHttps,
-                Port = fakeUri.IsDefaultPort ? -1 : fakeUri.Port,
-                Path = $"{fakeUri.PathAndQuery}"
-            };
+            var fakeUri = new Uri($"https://{canonicalRepoName}");
             if (!WellKnownRegistryMapping.TryGetValue(fakeUri.Host, out var registryHost))
             {
-                registryHost = fakeUri.Host;
+                registryHost = fakeUri.GetComponents(UriComponents.Host | UriComponents.Port, UriFormat.SafeUnescaped);
             }
-            manifestUriBuilder.Host = registryHost;
-            return manifestUriBuilder.Uri;
+
+            return new ProbeContext
+            {
+                Registry = registryHost,
+                RepoName = fakeUri.AbsolutePath.Substring(1),
+                TagOrDigest = job.Tag ?? job.Digest
+            };
         }
 
         private static readonly Dictionary<string, string> WellKnownRegistryMapping = new Dictionary<string, string>()
@@ -130,6 +128,13 @@ namespace SharpCR.JobDispatcher.Services
                     catch { return null; }
                 })
                 .FirstOrDefault(m => m != null);
+        }
+        
+        class ProbeContext
+        {
+            public string Registry { get; set; } 
+            public string RepoName { get; set; }
+            public string TagOrDigest { get; set; }
         }
     }
 }

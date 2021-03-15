@@ -1,9 +1,7 @@
 ﻿using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
-using Microsoft.AspNetCore.StaticFiles;
+using SharpCR.JobDispatcher.Services;
 using SharpCR.Manifests;
-
 
 namespace SharpCR.JobDispatcher.Models
 {
@@ -36,14 +34,6 @@ namespace SharpCR.JobDispatcher.Models
                 subItemsJson = string.Join(',', ManifestItems.Select(item => Encoding.UTF8.GetString(ListManifest.RawJsonBytes)));
             }
             return string.Format(format, listManifestJson, subItemsJson);
-        }
-    }
-
-    public static class ManifestExtensions
-    {
-        public static long LayerTotalSize(this Manifest manifest)
-        {
-            return manifest.Layers?.Select(l => l.Size ?? 0).Sum() ?? 0;
         }
     }
 }

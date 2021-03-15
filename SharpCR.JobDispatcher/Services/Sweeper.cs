@@ -45,7 +45,7 @@ namespace SharpCR.JobDispatcher.Services
                 {
                     var job = _theWorkingList[index];
                     var lastTrial = job.Trails.OrderByDescending(t => t.StartTime).First();
-                    var maxSeconds = Math.Max(job.Size / (_config.LowestSyncSpeedKbps * 1024), 5);
+                    var maxSeconds = Math.Max((job.Size ?? 0) / (_config.LowestSyncSpeedKbps * 1024), 5);
                     var elapsed = now - lastTrial.StartTime;
 
                     if (elapsed.TotalSeconds > maxSeconds)
