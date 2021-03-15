@@ -28,12 +28,12 @@ namespace SharpCR.JobDispatcher.Services
 
             var parserType = typeof(IManifestParser);
             _parsers = parserType.Assembly.GetExportedTypes()
-                .Where(t => t.IsPublic && t.IsClass && parserType.IsAssignableFrom(t))
+                .Where(t => (t.IsPublic || t.IsNestedPublic) && t.IsClass && parserType.IsAssignableFrom(t))
                 .Select(x => Activator.CreateInstance(x) as IManifestParser)
                 .ToArray();
         }
 
-        public async Task<ProbedManifest> ProbeManifestAsync(Job jobRequest)
+        public async Task<ProbedResult> ProbeManifestAsync(Job jobRequest)
         {
             var jobPublic = jobRequest.ToPublicModel();
             var reference = string.IsNullOrEmpty(jobRequest.Tag) ? jobRequest.Digest : jobRequest.Tag;
@@ -44,17 +44,39 @@ namespace SharpCR.JobDispatcher.Services
                 var configuration = new RegistryClientConfiguration(manifestUrl.GetComponents(UriComponents.Host | UriComponents.Port, UriFormat.SafeUnescaped));
                 var authProvider = new AnonymousOAuthAuthenticationProvider();
                 using var client = configuration.CreateClient(authProvider);
-                var manifestResult = await client.Manifest.GetManifestAsync(manifestUrl.PathAndQuery.Substring(1, 
-                    manifestUrl.PathAndQuery.IndexOf(ManifestUrlPattern, StringComparison.Ordinal) -1), reference);
-                var manifestBytes = Encoding.UTF8.GetBytes(manifestResult.Content);
-                var parsedManifest = TryParseManifestFromResponse(manifestBytes);
+
+                var repoName = manifestUrl.PathAndQuery.Substring(1, 
+                    manifestUrl.PathAndQuery.IndexOf(ManifestUrlPattern, StringComparison.Ordinal) -1);
                 
-                return new ProbedManifest
+                var manifestResult = await client.Manifest.GetManifestAsync(repoName, reference);
+                var parsedManifest = TryParseManifestFromResponse(Encoding.UTF8.GetBytes(manifestResult.Content));
+
+                if (parsedManifest == null)
                 {
-                    Bytes = manifestBytes,
-                    MediaType = manifestResult.MediaType,
-                    Size = (parsedManifest.Layers ?? new Descriptor[0]).Select(l => l.Size ?? 0).Sum()
-                };
+                    return null;
+                }
+
+                var probeManifestAsync = new ProbedResult();
+                if (parsedManifest is ManifestV2List manifestV2List)
+                {
+                    probeManifestAsync.ListManifest = manifestV2List;
+                    var subManifests = new List<Manifest>();
+                    foreach (var listItem in manifestV2List.Manifests)
+                    {
+                        var subManifestResult = await client.Manifest.GetManifestAsync(repoName, listItem.Digest);
+                        var manifest = TryParseManifestFromResponse(Encoding.UTF8.GetBytes(subManifestResult.Content));
+                        if (manifest != null)
+                        {
+                            subManifests.Add(manifest);
+                        }
+                    }
+                    probeManifestAsync.ManifestItems = subManifests.ToArray();
+                }
+                else
+                {
+                    probeManifestAsync.ManifestItems = new[] {parsedManifest};
+                }
+                return probeManifestAsync;
             }
             catch (Exception ex)
             {

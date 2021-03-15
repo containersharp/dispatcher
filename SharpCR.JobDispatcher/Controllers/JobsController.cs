@@ -42,14 +42,21 @@ namespace SharpCR.JobDispatcher.Controllers
                 _logger.LogInformation("No manifest found for request: @job", syncJob.ToPublicModel());
                 return NotFound();
             }
-
-            syncJob.Id = Guid.NewGuid().ToString("N");
-            syncJob.Size = upstreamManifest.Size;
-            _theJobQueue.AddJob(syncJob);
-
-            _logger.LogInformation("Sync request queued: @job", syncJob.ToPublicModel());
-            var manifestStream = new MemoryStream(upstreamManifest.Bytes);
-            return new FileStreamResult(manifestStream, upstreamManifest.MediaType);
+            
+            foreach (var manifestItem in upstreamManifest.ManifestItems)
+            {
+                var actualJob = new Job
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Size = manifestItem.LayerTotalSize(),
+                    Digest = manifestItem.Digest,
+                    AuthorizationToken = syncJob.AuthorizationToken
+                    // ImageRepository = 
+                };
+                _theJobQueue.AddJob(actualJob);
+                _logger.LogInformation("Sync request queued: @job", actualJob.ToPublicModel());
+            }
+            return Content(upstreamManifest.ToJsonString(), "application/json");
         }
 
         [HttpGet]
