@@ -22,19 +22,33 @@ namespace SharpCR.JobDispatcher.Controllers
         }
 
         [HttpPost]
-        public IActionResult Post([FromBody] Job syncJob)
+        public IActionResult Post([FromBody] Job[] batch)
         {
-            var noRepo = syncJob == null || string.IsNullOrEmpty(syncJob.ImageRepository) || (string.IsNullOrEmpty(syncJob.Tag) && string.IsNullOrEmpty(syncJob.Digest));
+            if (batch == null)
+            {
+                return NotFound();
+            }
+
+            foreach (var job in batch)
+            {
+                ScheduleJob(job);
+            }
+            return Accepted();
+        }
+
+        private void ScheduleJob(Job syncJob)
+        {
+            var noRepo = syncJob == null || string.IsNullOrEmpty(syncJob.ImageRepository) ||
+                         (string.IsNullOrEmpty(syncJob.Tag) && string.IsNullOrEmpty(syncJob.Digest));
             if (noRepo)
             {
-                _logger.LogWarning("Ignoring request: no valid sync job object found.");
-                return NotFound();
+                _logger.LogWarning("Ignoring job @job: no valid sync job object found.", syncJob?.ToPublicModel());
+                return;
             }
 
             syncJob.Id = Guid.NewGuid().ToString("N");
             _theJobQueue.AddJob(syncJob);
             _logger.LogInformation("Sync request queued: @job", syncJob.ToPublicModel());
-            return Accepted();
         }
 
         [HttpGet]
