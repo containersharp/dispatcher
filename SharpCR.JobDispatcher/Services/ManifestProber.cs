@@ -16,7 +16,7 @@ namespace SharpCR.JobDispatcher.Services
 {
     public class ManifestProber
     {
-        private const string ManifestUrlPrefix = "/v2/manifests/";
+        private const string ManifestUrlPattern = "/v2/manifests/";
         private readonly ILogger<ManifestProber> _logger;
         private readonly HttpClient _httpClient;
         private IManifestParser[] _parsers;
@@ -44,7 +44,8 @@ namespace SharpCR.JobDispatcher.Services
                 var configuration = new RegistryClientConfiguration(manifestUrl.GetComponents(UriComponents.Host | UriComponents.Port, UriFormat.SafeUnescaped));
                 var authProvider = new AnonymousOAuthAuthenticationProvider();
                 using var client = configuration.CreateClient(authProvider);
-                var manifestResult = await client.Manifest.GetManifestAsync(manifestUrl.PathAndQuery.Substring(ManifestUrlPrefix.Length), reference);
+                var manifestResult = await client.Manifest.GetManifestAsync(manifestUrl.PathAndQuery.Substring(1, 
+                    manifestUrl.PathAndQuery.IndexOf(ManifestUrlPattern, StringComparison.Ordinal) -1), reference);
                 var manifestBytes = Encoding.UTF8.GetBytes(manifestResult.Content);
                 var parsedManifest = TryParseManifestFromResponse(manifestBytes);
                 
@@ -75,16 +76,18 @@ namespace SharpCR.JobDispatcher.Services
                 imageRegistry = $"docker.io/{imageRegistry}";
             }
 
-            var fakeUri = new Uri($"https://{ManifestUrlPrefix}{imageRegistry}");
-            var manifestUriBuilder = new UriBuilder(Uri.UriSchemeHttps);
+            var fakeUri = new Uri($"https://{imageRegistry}{ManifestUrlPattern}");
+            var manifestUriBuilder = new UriBuilder
+            {
+                Scheme = Uri.UriSchemeHttps,
+                Port = fakeUri.IsDefaultPort ? -1 : fakeUri.Port,
+                Path = $"{fakeUri.PathAndQuery}"
+            };
             if (!WellKnownRegistryMapping.TryGetValue(fakeUri.Host, out var registryHost))
             {
                 registryHost = fakeUri.Host;
             }
             manifestUriBuilder.Host = registryHost;
-            manifestUriBuilder.Port = fakeUri.Port;
-            manifestUriBuilder.Path = $"{fakeUri.PathAndQuery}";
-
             return manifestUriBuilder.Uri;
         }
 
