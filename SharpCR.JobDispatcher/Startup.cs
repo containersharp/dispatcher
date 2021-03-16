@@ -1,8 +1,10 @@
-using System.Collections.Concurrent;
+using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,6 +25,7 @@ namespace SharpCR.JobDispatcher
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddScoped<AuthenticationMiddleware>();
             services.AddSingleton(new JobProducerConsumerQueue(new CancellationTokenSource()));
             services.AddSingleton(new List<Job>());
             services.AddSingleton<Sweeper>();
@@ -38,6 +41,7 @@ namespace SharpCR.JobDispatcher
                 app.UseDeveloperExceptionPage();
             }
 
+            app.UseMiddleware<AuthenticationMiddleware>();
             app.UseHttpsRedirection();
             app.UseRouting();
             app.UseAuthorization();

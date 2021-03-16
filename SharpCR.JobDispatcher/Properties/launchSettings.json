@@ -24,6 +24,7 @@
       "launchUrl": "jobs",
       "applicationUrl": "https://*:5001;http://*:5000",
       "environmentVariables": {
+        "DISPATCHER_AUTH_TOKEN": "foo-bar",
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     }
