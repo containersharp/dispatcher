@@ -39,7 +39,7 @@ namespace SharpCR.JobDispatcher.Controllers
         private void ScheduleJob(Job syncJob)
         {
             var noRepo = syncJob == null || string.IsNullOrEmpty(syncJob.ImageRepository) ||
-                         (string.IsNullOrEmpty(syncJob.Tag) && string.IsNullOrEmpty(syncJob.Digest));
+                         (string.IsNullOrEmpty(syncJob.Digest) && string.IsNullOrEmpty(syncJob.Tag));
             if (noRepo)
             {
                 _logger.LogWarning("Ignoring job @job: no valid sync job object found.", syncJob?.ToPublicModel());

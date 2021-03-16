@@ -107,7 +107,7 @@ namespace SharpCR.JobDispatcher.Services
             {
                 Registry = registryHost,
                 RepoName = fakeUri.AbsolutePath.Substring(1),
-                TagOrDigest = job.Tag ?? job.Digest
+                DigestOrTag = job.Digest ?? job.Tag
             };
         }
 
@@ -134,7 +134,7 @@ namespace SharpCR.JobDispatcher.Services
         {
             public string Registry { get; set; } 
             public string RepoName { get; set; }
-            public string TagOrDigest { get; set; }
+            public string DigestOrTag { get; set; }
         }
     }
 }

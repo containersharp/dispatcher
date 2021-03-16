@@ -31,7 +31,7 @@ namespace SharpCR.JobDispatcher.Models
 
             if (ManifestItems != null && ManifestItems.Length > 0)
             {
-                subItemsJson = string.Join(',', ManifestItems.Select(item => Encoding.UTF8.GetString(ListManifest.RawJsonBytes)));
+                subItemsJson = string.Join(',', ManifestItems.Select(item => Encoding.UTF8.GetString(item.RawJsonBytes)));
             }
             return string.Format(format, listManifestJson, subItemsJson);
         }
