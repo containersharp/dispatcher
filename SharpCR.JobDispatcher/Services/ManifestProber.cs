@@ -36,7 +36,13 @@ namespace SharpCR.JobDispatcher.Services
             try
             {
                 var configuration = new RegistryClientConfiguration(probeContext.Registry);
-                var authProvider = new AnonymousOAuthAuthenticationProvider();
+                var credentials = string.IsNullOrEmpty(jobRequest.AuthorizationToken)
+                    ? null
+                    : jobRequest.AuthorizationToken.Split(':', StringSplitOptions.RemoveEmptyEntries);
+
+                var authProvider = credentials == null
+                    ? (AuthenticationProvider)new AnonymousOAuthAuthenticationProvider()
+                    : new PasswordOAuthAuthenticationProvider(credentials.Length > 1 ? credentials[0] : "token",  credentials[1]);
                 using var client = configuration.CreateClient(authProvider);
 
                 var manifestResult = await client.Manifest.GetManifestAsync(probeContext.RepoName, reference);
