@@ -11,4 +11,13 @@
     <PackageReference Include="SharpCR" Version="1.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Remove="runtimeconfig.template.json" />
+    <None Include="runtimeconfig.template.json">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
