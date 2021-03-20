@@ -57,12 +57,18 @@ namespace SharpCR.JobDispatcher.Controllers
                     jobAssignmentTask = null;
                     return false;
                 }
-                    
+                
                 jobAssignmentTask.SetResult(job);
                 return true;
             });
+            
             await Task.WhenAny(jobAssignmentTask.Task, delayTask);
-            return jobAssignmentTask.Task.Status == TaskStatus.RanToCompletion ? jobAssignmentTask.Task.Result : null;
+            var assigningJob = jobAssignmentTask.Task.Status == TaskStatus.RanToCompletion ? jobAssignmentTask.Task.Result : null;
+            if (null != assigningJob)
+            {
+                _logger.LogInformation("Assigning to worker {@worker}: job: {@job}", worker, assigningJob.ToPublicModel());
+            }
+            return assigningJob;
         }
         
         
@@ -75,12 +81,12 @@ namespace SharpCR.JobDispatcher.Controllers
 
             if (result == 0)
             {
-                _logger.LogInformation("Job @job successfully synced by worker @worker.", job.ToPublicModel(), worker);
+                _logger.LogInformation("Job {@job} successfully synced by worker {@worker}.", job.ToPublicModel(), worker);
                 return;
             }
             
             var tryAgain = job.Trails.Count < _config.MaxTrails;
-            _logger.LogWarning("Job @job has failed from worker @worker. Try again: @tryAgain", job.ToPublicModel(), worker, tryAgain);
+            _logger.LogWarning("Job {@job} has failed from worker {worker}. Try again: {@tryAgain}", job.ToPublicModel(), worker, tryAgain);
             if (tryAgain)
             {
                 _theJobQueue.AddJob(job);

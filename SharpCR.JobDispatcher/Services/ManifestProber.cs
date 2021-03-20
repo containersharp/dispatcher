@@ -57,7 +57,7 @@ namespace SharpCR.JobDispatcher.Services
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Error probing manifest for job @job. Error: @ex", jobPublic, ex.ToString());
+                _logger.LogWarning("Error probing manifest for job {@job}. Error: {@ex}", jobPublic, ex.ToString());
                 return null;
             }
         }

@@ -42,13 +42,13 @@ namespace SharpCR.JobDispatcher.Controllers
                          (string.IsNullOrEmpty(syncJob.Digest) && string.IsNullOrEmpty(syncJob.Tag));
             if (noRepo)
             {
-                _logger.LogWarning("Ignoring job @job: no valid sync job object found.", syncJob?.ToPublicModel());
+                _logger.LogWarning("Ignoring job {@job}: no valid sync job object found.", syncJob?.ToPublicModel());
                 return;
             }
 
             syncJob.Id = Guid.NewGuid().ToString("N");
             _theJobQueue.AddJob(syncJob);
-            _logger.LogInformation("Sync request queued: @job", syncJob.ToPublicModel());
+            _logger.LogInformation("Sync request queued: {@job}", syncJob.ToPublicModel());
         }
 
         [HttpGet]

@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.ComponentModel.Design.Serialization;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SharpCR.JobDispatcher.Models;
@@ -53,12 +50,12 @@ namespace SharpCR.JobDispatcher.Services
                         var trailsCount = job.Trails.Count;
                         var tryAgain = trailsCount < _config.MaxTrails;
                         _logger.LogWarning(
-                            "Job @job has exceeded its longest waiting time (@totalSeconds > @maxSeconds), this is the @trail time. try again: @tryAgain",
+                            "Job {job} has exceeded its longest waiting time ({totalSeconds}s > {maxSeconds}s), this is the {trail} time. try again: {tryAgain}",
                             job.ToPublicModel(), elapsed.TotalSeconds, trailsCount, maxSeconds, tryAgain);
                         indexesToRemove.Add(index);
                         if (tryAgain)
                         {
-                            _logger.LogWarning("Retrying job @job", job.ToPublicModel());
+                            _logger.LogWarning("Retrying job {@job}", job.ToPublicModel());
                             _theJobQueue.AddJob(job);
                         }
                     }
