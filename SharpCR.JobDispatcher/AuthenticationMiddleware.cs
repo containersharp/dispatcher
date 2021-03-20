@@ -1,15 +1,16 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace SharpCR.JobDispatcher
 {
     public class AuthenticationMiddleware : IMiddleware
     {
         private readonly string _authKey;
-        public AuthenticationMiddleware(IConfiguration configuration)
+        public AuthenticationMiddleware(IOptions<DispatcherConfig> dispatcherOptions)
         {
-            _authKey = configuration["DISPATCHER_AUTH_TOKEN"];
+            _authKey = dispatcherOptions.Value.AuthorizationToken;
         }
 
         public async Task InvokeAsync(HttpContext context, RequestDelegate next)

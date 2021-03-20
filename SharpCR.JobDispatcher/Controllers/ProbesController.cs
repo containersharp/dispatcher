@@ -1,6 +1,7 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using SharpCR.JobDispatcher.Models;
 using SharpCR.JobDispatcher.Services;
 
@@ -22,6 +23,7 @@ namespace SharpCR.JobDispatcher.Controllers
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] Job syncJob)
         {
+            
             if (syncJob == null || string.IsNullOrEmpty(syncJob.ImageRepository))
             {
                 _logger.LogWarning("Ignoring request: no valid sync job object found.");
@@ -35,7 +37,8 @@ namespace SharpCR.JobDispatcher.Controllers
                 return NotFound();
             }
 
-            return Content(upstreamManifest.ToJsonString(), "application/json");
+            var serializeObject = JsonConvert.SerializeObject(upstreamManifest.ToPacked());
+            return Content(serializeObject, "application/json");
         }
     }
 }

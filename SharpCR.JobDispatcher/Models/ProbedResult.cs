@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using SharpCR.JobDispatcher.Services;
 using SharpCR.Manifests;
@@ -22,18 +23,20 @@ namespace SharpCR.JobDispatcher.Models
                 .Sum();
         }
 
-        public string ToJsonString()
+        public Packed ToPacked()
         {
-            var format = @"{{""listManifest"":{0},""manifestItems"":[{1}]}}";
-
-            var listManifestJson = ListManifest == null ? "null" : Encoding.UTF8.GetString(ListManifest.RawJsonBytes);
-            var subItemsJson = string.Empty;
-
-            if (ManifestItems != null && ManifestItems.Length > 0)
+            return new Packed
             {
-                subItemsJson = string.Join(',', ManifestItems.Select(item => Encoding.UTF8.GetString(item.RawJsonBytes)));
-            }
-            return string.Format(format, listManifestJson, subItemsJson);
+                ListManifest = this.ListManifest.RawJsonBytes,
+                ManifestItems = this.ManifestItems.Select(i => i.RawJsonBytes).ToList()
+            };
+        }
+
+
+        public class Packed
+        {
+            public byte[] ListManifest { get; set; }
+            public List<byte[]> ManifestItems { get; set; }
         }
     }
 }

@@ -9,7 +9,7 @@
 
         public int MaxTrails { get; set; } = 3;
         
-        public string AuthorizationKey { get; set; } = "hello";
+        public string AuthorizationToken { get; set; }
 
     }
 }
