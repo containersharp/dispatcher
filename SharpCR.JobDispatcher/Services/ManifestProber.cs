@@ -92,18 +92,7 @@ namespace SharpCR.JobDispatcher.Services
         static ProbeContext GetProbeContext(Job job)
         {
             var rawRepoName = job.ImageRepository;
-            var canonicalRepoName = rawRepoName;
-            var parts = rawRepoName.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 1)
-            {
-                canonicalRepoName = $"docker.io/library/{rawRepoName}";
-            }
-            if (parts.Length == 2)
-            {
-                canonicalRepoName = $"docker.io/{rawRepoName}";
-            }
-
-            var fakeUri = new Uri($"https://{canonicalRepoName}");
+            var fakeUri = new Uri($"https://{rawRepoName}");
             if (!WellKnownRegistryMapping.TryGetValue(fakeUri.Host, out var registryHost))
             {
                 registryHost = fakeUri.GetComponents(UriComponents.Host | UriComponents.Port, UriFormat.SafeUnescaped);
@@ -120,6 +109,7 @@ namespace SharpCR.JobDispatcher.Services
         private static readonly Dictionary<string, string> WellKnownRegistryMapping = new Dictionary<string, string>()
         {
             {"docker.io", "registry-1.docker.io"},
+            {"index.docker.io", "registry-1.docker.io"},
             {"hub.docker.com", "registry-1.docker.io"},
         };
 
