@@ -66,6 +66,7 @@ namespace SharpCR.JobDispatcher.Controllers
             var assigningJob = jobAssignmentTask.Task.Status == TaskStatus.RanToCompletion ? jobAssignmentTask.Task.Result : null;
             if (null != assigningJob)
             {
+                _theWorkingList.Add(assigningJob);
                 _logger.LogInformation("Assigning to worker {@worker}: job: {@job}", worker, assigningJob.ToPublicModel());
             }
             return assigningJob;

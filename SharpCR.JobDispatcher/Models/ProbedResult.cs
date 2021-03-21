@@ -27,8 +27,8 @@ namespace SharpCR.JobDispatcher.Models
         {
             return new Packed
             {
-                ListManifest = this.ListManifest.RawJsonBytes,
-                ManifestItems = this.ManifestItems.Select(i => i.RawJsonBytes).ToList()
+                ListManifest = this.ListManifest?.RawJsonBytes,
+                ManifestItems = this.ManifestItems?.Select(i => i.RawJsonBytes).ToList()
             };
         }
 
