@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SharpCR.JobDispatcher.Models;
@@ -42,16 +43,15 @@ namespace SharpCR.JobDispatcher.Services
                 {
                     var job = _theWorkingList[index];
                     var lastTrial = job.Trails.OrderByDescending(t => t.StartTime).First();
-                    var maxSeconds = Math.Max((job.Size ?? 0) / (_config.LowestSyncSpeedKbps * 1024), 5);
+                    var maxSeconds = Math.Max((job.Size ?? 0) / (_config.LowestSyncSpeedKbps * 1024), 300);
                     var elapsed = now - lastTrial.StartTime;
 
                     if (elapsed.TotalSeconds > maxSeconds)
                     {
                         var trailsCount = job.Trails.Count;
                         var tryAgain = trailsCount < _config.MaxTrails;
-                        _logger.LogWarning(
-                            "Job {job} has exceeded its longest waiting time ({totalSeconds}s > {maxSeconds}s), this is the {trail} time. try again: {tryAgain}",
-                            job.ToPublicModel(), elapsed.TotalSeconds, trailsCount, maxSeconds, tryAgain);
+                        _logger.LogWarning("Job {job} has exceeded its longest waiting time ({totalSeconds}s > {maxSeconds}s), this is the {trail} time. try again: {tryAgain}",
+                            job.ToPublicModel(), elapsed.TotalSeconds, maxSeconds, trailsCount, tryAgain);
                         indexesToRemove.Add(index);
                         if (tryAgain)
                         {
@@ -66,7 +66,7 @@ namespace SharpCR.JobDispatcher.Services
                     _theWorkingList.RemoveAt(index);
                 }
 
-                Thread.Sleep(TimeSpan.FromMilliseconds(100));
+                Task.Delay(TimeSpan.FromMilliseconds(100)).ConfigureAwait(false).GetAwaiter().GetResult();
             }
         }
 

@@ -40,7 +40,6 @@ namespace SharpCR.JobDispatcher
             }
 
             app.UseMiddleware<AuthenticationMiddleware>();
-            app.UseHttpsRedirection();
             app.UseRouting();
             app.UseAuthorization();
             app.UseEndpoints(endpoints =>

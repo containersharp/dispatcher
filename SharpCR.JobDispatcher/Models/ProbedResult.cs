@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using SharpCR.JobDispatcher.Services;
 using SharpCR.Manifests;
 
 namespace SharpCR.JobDispatcher.Models
@@ -9,18 +8,6 @@ namespace SharpCR.JobDispatcher.Models
     {
         public ManifestV2List ListManifest { get; set; }
         public Manifest[] ManifestItems { get; set; }
-
-        public long GetTotalSize()
-        {
-            if (ManifestItems == null || ManifestItems.Length == 0)
-            {
-                return 0;
-            }
-            
-            return ManifestItems
-                .Select(item => item.LayerTotalSize())
-                .Sum();
-        }
 
         public Packed ToPacked()
         {

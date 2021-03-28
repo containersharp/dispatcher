@@ -22,20 +22,21 @@ namespace SharpCR.JobDispatcher.Controllers
         
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] Job syncJob)
-        {         
+        {
+            
             if (syncJob == null || string.IsNullOrEmpty(syncJob.ImageRepository))
             {
                 _logger.LogWarning("Ignoring request: no valid sync job object found.");
                 return NotFound();
             }
-
+            
             var upstreamManifest =  await _prober.ProbeManifestAsync(syncJob);
             if (upstreamManifest == null)
             {
                 _logger.LogInformation("No manifest found for request: {@job}", syncJob.ToPublicModel());
                 return NotFound();
             }
-
+            
             var serializeObject = JsonConvert.SerializeObject(upstreamManifest.ToPacked());
             return Content(serializeObject, "application/json");
         }

@@ -26,6 +26,7 @@ namespace SharpCR.JobDispatcher.Models
                 Id = this.Id,
                 ImageRepository = this.ImageRepository,
                 Tag = this.Tag,
+                Size = this.Size,
                 Digest = this.Digest,
                 Trails = this.Trails
             };
