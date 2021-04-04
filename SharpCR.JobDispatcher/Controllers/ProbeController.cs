@@ -21,7 +21,7 @@ namespace SharpCR.JobDispatcher.Controllers
         }
         
         [HttpPost]
-        public async Task<IActionResult> Post([FromBody] Job syncJob)
+        public async Task<IActionResult> Post([FromBody] Job syncJob, [FromQuery] string dig)
         {
             if (syncJob == null || string.IsNullOrEmpty(syncJob.ImageRepository))
             {
@@ -29,7 +29,7 @@ namespace SharpCR.JobDispatcher.Controllers
                 return NotFound();
             }
             
-            var upstreamManifest =  await _prober.ProbeManifestAsync(syncJob);
+            var upstreamManifest =  await _prober.ProbeManifestAsync(syncJob, !string.IsNullOrEmpty(dig));
             if (upstreamManifest == null)
             {
                 _logger.LogInformation("No manifest found for request: {@job}", syncJob.ToPublicModel());

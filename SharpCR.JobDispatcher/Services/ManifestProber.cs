@@ -27,7 +27,7 @@ namespace SharpCR.JobDispatcher.Services
                 .ToArray();
         }
 
-        public async Task<ProbedResult> ProbeManifestAsync(Job jobRequest)
+        public async Task<ProbedResult> ProbeManifestAsync(Job jobRequest, bool digSubManifests)
         {
             var jobPublic = jobRequest.ToPublicModel();
             var reference = string.IsNullOrEmpty(jobRequest.Tag) ? jobRequest.Digest : jobRequest.Tag;
@@ -53,7 +53,7 @@ namespace SharpCR.JobDispatcher.Services
                     return null;
                 }
 
-                return await DigSubManifests(parsedManifest, client, probeContext.RepoName);
+                return await WrapAsResult(parsedManifest, client, probeContext.RepoName, digSubManifests);
             }
             catch (Exception ex)
             {
@@ -62,24 +62,28 @@ namespace SharpCR.JobDispatcher.Services
             }
         }
 
-        private async Task<ProbedResult> DigSubManifests(Manifest parsedManifest, IRegistryClient client, string repoName)
+        private async Task<ProbedResult> WrapAsResult(Manifest parsedManifest, IRegistryClient client, string repoName, bool digSubManifests)
         {
             var probedResult = new ProbedResult();
             
             if (parsedManifest is ManifestV2List manifestV2List)
             {
                 probedResult.ListManifest = manifestV2List;
-                var subManifests = new List<Manifest>();
-                foreach (var listItem in manifestV2List.Manifests)
+                if (digSubManifests)
                 {
-                    var subManifestResult = await client.Manifest.GetManifestAsync(repoName, listItem.Digest);
-                    var manifest = TryParseManifestFromResponse(Encoding.UTF8.GetBytes(subManifestResult.Content));
-                    if (manifest != null)
+                    var subManifests = new List<Manifest>();
+                    foreach (var listItem in manifestV2List.Manifests)
                     {
-                        subManifests.Add(manifest);
+                        var subManifestResult = await client.Manifest.GetManifestAsync(repoName, listItem.Digest);
+                        var manifest = TryParseManifestFromResponse(Encoding.UTF8.GetBytes(subManifestResult.Content));
+                        if (manifest != null)
+                        {
+                            subManifests.Add(manifest);
+                        }
                     }
+
+                    probedResult.ManifestItems = subManifests.ToArray();
                 }
-                probedResult.ManifestItems = subManifests.ToArray();
             }
             else
             {
