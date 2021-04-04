@@ -7,6 +7,7 @@ using Docker.Registry.DotNet;
 using Docker.Registry.DotNet.Authentication;
 using Docker.Registry.DotNet.Registry;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SharpCR.JobDispatcher.Models;
 using SharpCR.Manifests;
 using Manifest = SharpCR.Manifests.Manifest;
@@ -16,10 +17,12 @@ namespace SharpCR.JobDispatcher.Services
     public class ManifestProber
     {
         private readonly ILogger<ManifestProber> _logger;
+        private readonly DispatcherConfig _config;
         private readonly IManifestParser[] _parsers;
-        public ManifestProber(ILogger<ManifestProber> logger)
+        public ManifestProber(ILogger<ManifestProber> logger, IOptions<DispatcherConfig> dispatcherOptions)
         {
             _logger = logger;
+            _config = dispatcherOptions.Value;
             var parserType = typeof(IManifestParser);
             _parsers = parserType.Assembly.GetExportedTypes()
                 .Where(t => (t.IsPublic || t.IsNestedPublic) && t.IsClass && parserType.IsAssignableFrom(t))
@@ -31,18 +34,12 @@ namespace SharpCR.JobDispatcher.Services
         {
             var jobPublic = jobRequest.ToPublicModel();
             var reference = string.IsNullOrEmpty(jobRequest.Tag) ? jobRequest.Digest : jobRequest.Tag;
-            var probeContext = GetProbeContext(jobRequest);
+            var probeContext = JobProcessor.ParseAsInternalContext(jobRequest);
 
             try
             {
                 var configuration = new RegistryClientConfiguration(probeContext.Registry);
-                var credentials = string.IsNullOrEmpty(jobRequest.AuthorizationToken)
-                    ? null
-                    : jobRequest.AuthorizationToken.Split(':', StringSplitOptions.RemoveEmptyEntries);
-
-                var authProvider = credentials == null
-                    ? (AuthenticationProvider)new AnonymousOAuthAuthenticationProvider()
-                    : new PasswordOAuthAuthenticationProvider(credentials.Length > 1 ? credentials[0] : "token",  credentials[1]);
+                var authProvider = CreateAuthProvider(jobRequest, probeContext);
                 using var client = configuration.CreateClient(authProvider);
 
                 var manifestResult = await client.Manifest.GetManifestAsync(probeContext.RepoName, reference);
@@ -52,7 +49,6 @@ namespace SharpCR.JobDispatcher.Services
                 {
                     return null;
                 }
-
                 return await WrapAsResult(parsedManifest, client, probeContext.RepoName, digSubManifests);
             }
             catch (Exception ex)
@@ -60,6 +56,15 @@ namespace SharpCR.JobDispatcher.Services
                 _logger.LogWarning("Error probing manifest for job {@job}. Error: {@ex}", jobPublic, ex.ToString());
                 return null;
             }
+        }
+
+        private AuthenticationProvider CreateAuthProvider(Job jobRequest, JobProcessor.ProbeContext probeContext)
+        {
+            var credential = JobProcessor.GetRegistryCredential(ref jobRequest, _config.BuiltinCredentials);
+
+            return credential == null
+                ? (AuthenticationProvider) new AnonymousOAuthAuthenticationProvider()
+                : new PasswordOAuthAuthenticationProvider(credential.Username, credential.Password);
         }
 
         private async Task<ProbedResult> WrapAsResult(Manifest parsedManifest, IRegistryClient client, string repoName, bool digSubManifests)
@@ -93,30 +98,6 @@ namespace SharpCR.JobDispatcher.Services
             return probedResult;
         }
 
-        static ProbeContext GetProbeContext(Job job)
-        {
-            var rawRepoName = job.ImageRepository;
-            var fakeUri = new Uri($"https://{rawRepoName}");
-            if (!WellKnownRegistryMapping.TryGetValue(fakeUri.Host, out var registryHost))
-            {
-                registryHost = fakeUri.GetComponents(UriComponents.Host | UriComponents.Port, UriFormat.SafeUnescaped);
-            }
-
-            return new ProbeContext
-            {
-                Registry = registryHost,
-                RepoName = fakeUri.AbsolutePath.Substring(1),
-                DigestOrTag = job.Digest ?? job.Tag
-            };
-        }
-
-        private static readonly Dictionary<string, string> WellKnownRegistryMapping = new Dictionary<string, string>()
-        {
-            {"docker.io", "registry-1.docker.io"},
-            {"index.docker.io", "registry-1.docker.io"},
-            {"hub.docker.com", "registry-1.docker.io"},
-        };
-
         Manifest TryParseManifestFromResponse(byte[] bytes)
         {
             return _parsers.Select(p =>
@@ -128,13 +109,6 @@ namespace SharpCR.JobDispatcher.Services
                     catch { return null; }
                 })
                 .FirstOrDefault(m => m != null);
-        }
-        
-        class ProbeContext
-        {
-            public string Registry { get; set; } 
-            public string RepoName { get; set; }
-            public string DigestOrTag { get; set; }
         }
     }
 }

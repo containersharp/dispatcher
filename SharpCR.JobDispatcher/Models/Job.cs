@@ -28,7 +28,8 @@ namespace SharpCR.JobDispatcher.Models
                 Tag = this.Tag,
                 Size = this.Size,
                 Digest = this.Digest,
-                Trails = this.Trails
+                Trails = this.Trails,
+                AuthorizationToken = !string.IsNullOrEmpty(this.AuthorizationToken) ? "<hidden>" : this.AuthorizationToken
             };
         }
     }

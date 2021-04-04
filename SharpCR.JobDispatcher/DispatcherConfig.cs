@@ -9,5 +9,13 @@
         
         public string AuthorizationToken { get; set; }
 
+        public RegistryCredential[] BuiltinCredentials { get; set; } = new RegistryCredential[0];
+    }
+
+    public class RegistryCredential
+    {
+        public string Hostname { get; set; }
+        public string Username { get; set; }
+        public string Password { get; set; }
     }
 }

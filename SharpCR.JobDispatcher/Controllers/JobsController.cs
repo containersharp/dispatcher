@@ -2,6 +2,7 @@
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SharpCR.JobDispatcher.Models;
 using SharpCR.JobDispatcher.Services;
 
@@ -14,12 +15,15 @@ namespace SharpCR.JobDispatcher.Controllers
         private readonly ILogger<JobsController> _logger;
         private readonly JobQueue _theJobQueue;
         private readonly JobWorkingList _workingList;
+        private readonly DispatcherConfig _dispatcherOptions;
 
-        public JobsController(ILogger<JobsController> logger,  JobQueue theJobQueue, JobWorkingList workingList)
+        public JobsController(ILogger<JobsController> logger,  JobQueue theJobQueue, JobWorkingList workingList,
+            IOptions<DispatcherConfig> dispatcherOptions)
         {
             _logger = logger;
             _theJobQueue = theJobQueue;
             _workingList = workingList;
+            _dispatcherOptions = dispatcherOptions.Value;
         }
 
         [HttpPost]
@@ -58,6 +62,7 @@ namespace SharpCR.JobDispatcher.Controllers
             }
 
             syncJob.Id = Guid.NewGuid().ToString("N");
+            JobProcessor.AssignBuiltinCredentialIfRequired(ref syncJob, _dispatcherOptions.BuiltinCredentials);
             _theJobQueue.AddJob(syncJob);
             _logger.LogInformation("Sync request queued: {@job}", syncJob.ToPublicModel());
         }
