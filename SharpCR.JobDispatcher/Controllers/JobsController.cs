@@ -13,12 +13,14 @@ namespace SharpCR.JobDispatcher.Controllers
     public class JobsController : ControllerBase
     {
         private readonly ILogger<JobsController> _logger;
-        private readonly JobProducerConsumerQueue _theJobQueue;
+        private readonly JobQueue _theJobQueue;
+        private readonly JobWorkingList _workingList;
 
-        public JobsController(ILogger<JobsController> logger,  JobProducerConsumerQueue theJobQueue)
+        public JobsController(ILogger<JobsController> logger,  JobQueue theJobQueue, JobWorkingList workingList)
         {
             _logger = logger;
             _theJobQueue = theJobQueue;
+            _workingList = workingList;
         }
 
         [HttpPost]
@@ -52,9 +54,16 @@ namespace SharpCR.JobDispatcher.Controllers
         }
 
         [HttpGet]
-        public IEnumerable<Job> Get()
+        public JobListResult Get()
         {
-            return _theJobQueue.GetPendingJobs().Select(job => job.ToPublicModel()).ToArray();
+            var queuedJobs = _theJobQueue.GetPendingJobs().Select(job => job.ToPublicModel()).ToArray();
+            var syncingJobs = _workingList.Snapshot().Select(job => job.ToPublicModel()).ToArray();
+
+            return new JobListResult
+            {
+                QueuedJobs = queuedJobs,
+                SyncingJobs = syncingJobs
+            };
         }
     }
 }

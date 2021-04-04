@@ -24,8 +24,8 @@ namespace SharpCR.JobDispatcher
         {
             services.Configure<DispatcherConfig>(Configuration.GetSection("DispatcherConfig"));
             services.AddScoped<AuthenticationMiddleware>();
-            services.AddSingleton(new JobProducerConsumerQueue(new CancellationTokenSource()));
-            services.AddSingleton(new List<Job>());
+            services.AddSingleton(new JobQueue(new CancellationTokenSource()));
+            services.AddSingleton(new JobWorkingList());
             services.AddSingleton<Sweeper>();
             services.AddSingleton<ManifestProber>();
             services.AddControllers();

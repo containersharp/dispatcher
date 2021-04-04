@@ -7,14 +7,14 @@ using SharpCR.JobDispatcher.Models;
 
 namespace SharpCR.JobDispatcher.Services
 {
-    public class JobProducerConsumerQueue : IDisposable
+    public sealed class JobQueue : IDisposable
     {
         private readonly CancellationTokenSource _closeSignal;
         private readonly BlockingCollection<Func<Job, bool>> _workerQueue;
         private readonly BlockingCollection<Job> _jobQueue;
         private Job _processingJob;
 
-        public JobProducerConsumerQueue(CancellationTokenSource closeSignal)
+        public JobQueue(CancellationTokenSource closeSignal)
         {
             _closeSignal = closeSignal;
             _workerQueue = new BlockingCollection<Func<Job, bool>>(new ConcurrentQueue<Func<Job, bool>>());
@@ -71,7 +71,7 @@ namespace SharpCR.JobDispatcher.Services
 
         private bool _isDisposed;
 
-        protected virtual void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (!_isDisposed)
             {
@@ -90,7 +90,6 @@ namespace SharpCR.JobDispatcher.Services
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         #endregion

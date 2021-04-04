@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -16,13 +15,13 @@ namespace SharpCR.JobDispatcher.Controllers
     public class WorkersController : ControllerBase
     {
         private readonly ILogger<WorkersController> _logger;
-        private readonly JobProducerConsumerQueue _theJobQueue;
-        private readonly List<Job> _theWorkingList;
+        private readonly JobQueue _theJobQueue;
+        private readonly JobWorkingList _theWorkingList;
         private readonly DispatcherConfig _config;
 
         public WorkersController(ILogger<WorkersController> logger,
             IOptions<DispatcherConfig> dispatcherOptions,
-            JobProducerConsumerQueue theJobQueue, List<Job> theWorkingList)
+            JobQueue theJobQueue, JobWorkingList theWorkingList)
         {
             _logger = logger;
             _theJobQueue = theJobQueue;
@@ -77,10 +76,9 @@ namespace SharpCR.JobDispatcher.Controllers
 
         private void HandleTrailResult(string worker, string jobId, int? result)
         {
-            var job = _theWorkingList.Find(j => j.Id == jobId);
+            var job = _theWorkingList.RemoveByJobId(jobId);
             if (job == null) return;
-            _theWorkingList.Remove(job);
-
+            
             if (result == 0)
             {
                 _logger.LogInformation("Job {@job} successfully synced by worker {@worker}.", job.ToPublicModel(), worker);
