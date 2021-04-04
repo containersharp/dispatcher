@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -45,6 +44,16 @@ namespace SharpCR.JobDispatcher.Controllers
             if (noRepo)
             {
                 _logger.LogWarning("Ignoring job {@job}: no valid sync job object found.", syncJob?.ToPublicModel());
+                return;
+            }
+            
+            var pendingJobs = _theJobQueue.GetPendingJobs().Concat(_workingList.Snapshot()).ToArray();
+            if(pendingJobs.Any(j =>
+                string.Equals( j.ImageRepository, syncJob.ImageRepository, StringComparison.OrdinalIgnoreCase)
+                && string.Equals( j.Tag, syncJob.Tag, StringComparison.OrdinalIgnoreCase)
+                && string.Equals( j.Digest, syncJob.Digest, StringComparison.OrdinalIgnoreCase)))
+            {
+                _logger.LogDebug("Ignoring job {@job}: duplicated job detected.", syncJob.ToPublicModel());
                 return;
             }
 
